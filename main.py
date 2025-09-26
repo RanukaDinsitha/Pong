@@ -12,7 +12,7 @@ pygame.display.set_caption("Ping Pong")
 pygame.display.set_icon(ICON)
 
 # Sets the frames:
-FPS = int(30)
+FPS = 30
 # Note, in the original it was 60, if having problems switch to 60 :)
 
 # Define the colors Black & White:
@@ -20,10 +20,12 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 
 # Define the Paddle's Width, and the Paddle's Height!
-PADDLE_WIDTH, PADDLE_HEIGHT, = int(20), int(100)
+PADDLE_WIDTH, PADDLE_HEIGHT = 20, 100
 
 # Start the class for our/AI's Paddle:
 class Paddle:
+    COLOR = WHITE  # paddles are white
+
     def __init__(self, x, y, width, height):
         self.x = x
         self.y = y
@@ -31,11 +33,17 @@ class Paddle:
         self.height = height
 
     def draw(self, win):
-        pygame.draw.rectangle(win, self.COLOR, ())
+        pygame.draw.rect(win, self.COLOR, (self.x, self.y, self.width, self.height))
+
 
 # The drawing function. *pretends to be an artist*:
-def draw(win):
+def draw(win, paddles):
     win.fill(BLACK)
+    
+    # Draw the Paddles! :)
+    for paddle in paddles:
+        paddle.draw(win)
+
     pygame.display.update()
 
 
@@ -44,13 +52,13 @@ def main():
     clock = pygame.time.Clock()
     run = True
 
-    # Let's Python do some Math to get the Paddles to worth. *calculator button presses*
-    left_paddle = Paddle(10, HEIGHT//2 - PADDLE_HEIGHT//2, PADDLE_WIDTH, PADDLE_HEIGHT)
-    right_paddle = Paddle(WIDTH - 10 - PADDLE_WIDTH, HEIGHT//2 - PADDLE_HEIGHT//2, PADDLE_WIDTH, PADDLE_HEIGHT)
+    # Let's Python do some Math to get the Paddles to work. *calculator button presses*
+    left_paddle = Paddle(10, HEIGHT // 2 - PADDLE_HEIGHT // 2, PADDLE_WIDTH, PADDLE_HEIGHT)
+    right_paddle = Paddle(WIDTH - 10 - PADDLE_WIDTH, HEIGHT // 2 - PADDLE_HEIGHT // 2, PADDLE_WIDTH, PADDLE_HEIGHT)
 
     while run:
         clock.tick(FPS)
-        draw(WIN)
+        draw(WIN, [left_paddle, right_paddle])
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
