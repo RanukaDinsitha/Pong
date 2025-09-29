@@ -1,13 +1,11 @@
 import pygame
 import sys
 import random
-import math
-import threading, time
-from snap import snap
+import time
 
 pygame.init()
 pygame.mixer.init()
-pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=2048) 
+pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=2048)
 
 # ------------------ Window Setup ------------------
 ICON = pygame.image.load("./assets/icon.png")
@@ -16,7 +14,6 @@ WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Ping Pong")
 pygame.display.set_icon(ICON)
 dev_test = True
-snap_mode = False
 
 FPS = 60
 WHITE = (255, 255, 255)
@@ -26,15 +23,16 @@ BLACK = (0, 0, 0)
 PADDLE_WIDTH, PADDLE_HEIGHT = 20, 100
 BALL_RADIUS = 7
 
-if dev_test == False:
+if not dev_test:
     try:
         SCORE_FONT = pygame.font.Font("./assets/number.ttf", 50)
         HIT_SOUND = pygame.mixer.Sound("./assets/paddle_hit.wav")
         END_CHEERING_YAY = pygame.mixer.Sound("./assets/crowd_cheering.wav")
     except pygame.error as e:
-        print(f"Critical error, please look if the assets folder is in the directory you placed this app?: {e}")
+        print(
+            f"Critical error, please look if the assets folder is in the directory you placed this app?: {e}")
         sys.exit(1)
-else: 
+else:
     SCORE_FONT = pygame.font.Font("./assets/number.ttf", 50)
     HIT_SOUND = pygame.mixer.Sound("./assets/paddle_hit.wav")
     END_CHEERING_YAY = pygame.mixer.Sound("./assets/crowd_cheering.wav")
@@ -108,7 +106,7 @@ class Ball:
 # ------------------ Drawing Function ------------------
 
 
-def draw(win, paddles, ball, left_score, right_score):
+def draw(win, paddles, ball, left_score, right_score, show_ball=True):
     win.fill(BLACK)
     left_score_text = SCORE_FONT.render(f"{left_score}", True, WHITE)
     right_score_text = SCORE_FONT.render(f"{right_score}", True, WHITE)
@@ -125,23 +123,21 @@ def draw(win, paddles, ball, left_score, right_score):
     for paddle in paddles:
         paddle.draw(win)
 
-    ball.draw(win)
+    if show_ball:   # ✅ only draw if allowed
+        ball.draw(win)
 
     for i in range(10, HEIGHT, HEIGHT // 20):
         if i % 2 == 1:
             continue
         pygame.draw.rect(win, WHITE, (WIDTH // 2 - 5, i, 10, HEIGHT // 20))
 
-    pygame.display.update()
-
 # ------------------ Collision Function ------------------
 
-def handle_collision(ball, left_paddle, right_paddle):
-    # Bounce on top/bottom walls (make it bouncier)
-    if ball.y + ball.radius >= HEIGHT or ball.y - ball.radius <= 0:
-        ball.y_vel *= -1.05  # reverse + small boost
 
-        # Cap vertical speed
+def handle_collision(ball, left_paddle, right_paddle):
+    # Bounce on top/bottom walls
+    if ball.y + ball.radius >= HEIGHT or ball.y - ball.radius <= 0:
+        ball.y_vel *= -1.05
         if abs(ball.y_vel) > ball.MAX_VEL:
             ball.y_vel = ball.MAX_VEL * (1 if ball.y_vel > 0 else -1)
 
@@ -149,33 +145,89 @@ def handle_collision(ball, left_paddle, right_paddle):
     if ball.x_vel < 0:
         if left_paddle.y <= ball.y <= left_paddle.y + left_paddle.height:
             if ball.x - ball.radius <= left_paddle.x + left_paddle.width:
-                ball.x_vel *= -1.1  # more bounce off paddle
+                ball.x_vel *= -1.1
                 middle_y = left_paddle.y + left_paddle.height / 2
                 difference_y = ball.y - middle_y
                 reduction_factor = (left_paddle.height / 2) / ball.MAX_VEL
-                ball.y_vel = difference_y / reduction_factor
-                ball.y_vel *= 1.25  # more curve/spin effect
-
-                # Speed cap
+                ball.y_vel = (difference_y / reduction_factor) * 1.25
                 ball.x_vel = max(min(ball.x_vel, ball.MAX_VEL), -ball.MAX_VEL)
                 ball.y_vel = max(min(ball.y_vel, ball.MAX_VEL), -ball.MAX_VEL)
-
                 HIT_SOUND.play()
     # Right paddle
     else:
         if right_paddle.y <= ball.y <= right_paddle.y + right_paddle.height:
             if ball.x + ball.radius >= right_paddle.x:
-                ball.x_vel *= -1.1 * 2
+                ball.x_vel *= -1.1
                 middle_y = right_paddle.y + right_paddle.height / 2
                 difference_y = ball.y - middle_y
                 reduction_factor = (right_paddle.height / 2) / ball.MAX_VEL
-                ball.y_vel = difference_y / reduction_factor
-                ball.y_vel *= 1.25
-
+                ball.y_vel = (difference_y / reduction_factor) * 1.25
                 ball.x_vel = max(min(ball.x_vel, ball.MAX_VEL), -ball.MAX_VEL)
                 ball.y_vel = max(min(ball.y_vel, ball.MAX_VEL), -ball.MAX_VEL)
-
                 HIT_SOUND.play()
+
+# ------------------ Celebration System ------------------
+
+
+celebrating = False
+celebration_start_time = 0
+celebration_duration = 10000  # 10s
+confetti_particles = []
+winner_side = None
+
+
+def start_celebration(winner):
+    global celebrating, celebration_start_time, confetti_particles, winner_side
+    celebrating = True
+    celebration_start_time = pygame.time.get_ticks()
+    winner_side = winner
+    confetti_particles = []
+
+    END_CHEERING_YAY.play()
+
+    # Spawn confetti
+    for _ in range(150):
+        x = WIDTH // 4 if winner == "left" else 3 * WIDTH // 4
+        y = random.randint(0, HEIGHT // 2)
+        confetti_particles.append({
+            "x": x + random.randint(-60, 60),
+            "y": y,
+            "vx": random.uniform(-2, 2),
+            "vy": random.uniform(1, 4),
+            "color": random.choice([(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)])
+        })
+
+
+def update_celebration():
+    global celebrating
+    now = pygame.time.get_ticks()
+
+    # Update confetti physics
+    for c in confetti_particles:
+        c["x"] += c["vx"]
+        c["y"] += c["vy"]
+        c["vy"] += 0.1  # gravity
+
+    # Draw confetti
+    for c in confetti_particles:
+        if 0 <= c["x"] <= WIDTH and 0 <= c["y"] <= HEIGHT:
+            pygame.draw.circle(WIN, c["color"], (int(c["x"]), int(c["y"])), 4)
+
+    # End celebration after duration
+    if now - celebration_start_time >= celebration_duration:
+        END_CHEERING_YAY.stop()
+        celebrating = False
+        reset_game()
+
+
+def reset_game():
+    """Resets paddles, ball, and scores."""
+    global left_score, right_score
+    left_score = 0
+    right_score = 0
+    left_paddle.reset()
+    right_paddle.reset()
+    ball.reset()
 
 # ------------------ Paddle Controls ------------------
 
@@ -192,8 +244,11 @@ def handle_paddle_movement(keys, left_paddle, right_paddle):
             right_paddle.VEL + right_paddle.height <= HEIGHT:
         right_paddle.move(up=False)
 
- # ------------------ Main Function ------------------
+# ------------------ Main Function ------------------
+
+
 def main():
+    global left_paddle, right_paddle, ball, left_score, right_score
     clock = pygame.time.Clock()
     run = True
 
@@ -225,6 +280,13 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
 
+        if celebrating:
+            draw(WIN, [left_paddle, right_paddle], ball,
+                left_score, right_score, show_ball=False)
+            update_celebration()
+            pygame.display.update()
+            continue
+
         keys = pygame.key.get_pressed()
         handle_paddle_movement(keys, left_paddle, right_paddle)
         ball.move()
@@ -246,15 +308,13 @@ def main():
             ball.reset()
 
         draw(WIN, [left_paddle, right_paddle], ball, left_score, right_score)
+        pygame.display.update()
 
+        # Check for winner
         if left_score >= WINNING_SCORE:
             start_celebration("left")
         elif right_score >= WINNING_SCORE:
             start_celebration("right")
-            
-        snap()
-
-            
 
     pygame.mixer.music.stop()
     pygame.quit()
